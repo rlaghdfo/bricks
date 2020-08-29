@@ -108,40 +108,49 @@ class Game(Scene):
                 return
 
             self.position += self.vector * BALL_SPEED
-
-            collide = False  # 충돌?
+            
+            collide = False
             n = ORIGIN  # 법선벡터
 
             # 원(공)-직사각형(벽돌) 충돌
+            collide_candidate = []
             for i in range(len(bricks)):
                 if bricks[i].collide_area.collidepoint(*self.position):  # 부딪혔다면
-                    collide = True
+                    collide_candidate.append(i)
 
-                    # 이분탐색(공 위치 보정)
+            # 이분탐색을 통한 시뮬레이션(공이 누구와 먼저 충돌했는지 확인 필요)
+            collide_one = -1
+            collide_move = 1e18
+            if len(collide_candidate):
+                collide = True
+                self.position -= self.vector * BALL_SPEED
+                for i in collide_candidate:
                     low = 0
                     high = BALL_SPEED
-                    self.position -= self.vector * BALL_SPEED
+                    tmp = copy.copy(self.position) 
                     for _ in range(10):
                         mid = (low + high) / 2
-                        if bricks[i].collide_area.collidepoint(*(self.position + self.vector * mid)):
+                        if bricks[i].collide_area.collidepoint(*(tmp + self.vector * mid)):
                             high = mid
                         else:
                             low = mid
-                    self.position += self.vector * high
-
-                    # 법선벡터 설정
-                    if abs(self.position[0] + BALL_RADIUS - bricks[i].rect.left) < 1 or \
-                            abs(self.position[0] - BALL_RADIUS - bricks[i].rect.right) < 1:
-                        n = HORIZONTAL
-                    else:
-                        n = VERTICAL
-
-                    # 벽돌이 0개라면 벽돌 삭제
-                    bricks[i].count -= 1
-                    if bricks[i].count == 0:
-                        bricks.pop(i)
-
-                    break
+                    if high < collide_move:
+                        collide_one = i
+                        collide_move = high
+            
+                self.position += self.vector * collide_move
+                
+                # 법선벡터 설정
+                if abs(self.position[0] + BALL_RADIUS - bricks[collide_one].rect.left) < 1 or \
+                    abs(self.position[0] - BALL_RADIUS - bricks[collide_one].rect.right) < 1:
+                    n = HORIZONTAL
+                else:
+                    n = VERTICAL
+                
+                # 벽돌 파괴
+                bricks[collide_one].count -= 1
+                if bricks[collide_one].count == 0:
+                    bricks.pop(collide_one)
 
             # 게임 공간 경계에서의 충돌 체크
             if self.position[0] - BALL_RADIUS <= 7 or self.position[0] + BALL_RADIUS >= WIDTH - 7:  # 양 사이드에 부딪혔을 때
